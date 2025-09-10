@@ -29,7 +29,7 @@ export const SocketProvider = ({ children }) => {
     // Don't create multiple connections
     if (socketRef.current) return;
 
-    console.log('Connecting to Socket.IO for user:', currentUser._id);
+    // Connecting to Socket.IO
     
     // Connect to Socket.IO server
     const socket = io(import.meta.env.VITE_BASEURL, {
@@ -41,13 +41,13 @@ export const SocketProvider = ({ children }) => {
     socketRef.current = socket;
     
     socket.on('connect', () => {
-      console.log('Socket.IO connected');
+      // Socket.IO connected
       // Join user's personal room
       socket.emit('join', { userId: currentUser._id });
     });
 
     socket.on('disconnect', () => {
-      console.log('Socket.IO disconnected');
+      // Socket.IO disconnected
     });
 
     socket.on('error', (error) => {
@@ -56,7 +56,7 @@ export const SocketProvider = ({ children }) => {
     });
 
     return () => {
-      console.log('Closing Socket.IO connection');
+      // Closing Socket.IO connection
       socket.disconnect();
       socketRef.current = null;
     };

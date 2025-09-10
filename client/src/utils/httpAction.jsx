@@ -9,11 +9,20 @@ const httpAction = async (data) => {
       credentials: "include", // ✅ cookie send & receive ke liye
     });
 
-    const result = await response.json();
+    let result;
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      result = await response.json();
+    } else {
+      // Fallback: try to read text and wrap it
+      const text = await response.text();
+      result = { message: text };
+    }
+
     if (!response.ok) throw new Error(result?.message || "Something went wrong");
     return result;
   } catch (error) {
-    toast.error(error.message);
+    toast.error(error.message || "Something went wrong");
     return null;
   }
 };

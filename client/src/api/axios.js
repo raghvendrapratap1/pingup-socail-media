@@ -1,11 +1,10 @@
 import axios from "axios";
 
+const baseURL = import.meta.env.VITE_BASEURL || "http://localhost:4000";
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_BASEURL,
-  withCredentials: true, // ✅ cookie send/receive ke liye
-//   headers: {
-//     "Content-Type": "application/json",
-//   },
+  baseURL,
+  withCredentials: true,
 });
 
 export default api;

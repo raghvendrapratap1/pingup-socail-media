@@ -20,6 +20,8 @@ const PostCard = ({post, fetchFeeds, onDeleted, playingVideos, toggleVideo}) => 
     const [showComments,setShowComments] = useState(false);
     const [comments,setComments] = useState(Array.isArray(post?.comments) ? post.comments : []);
     const [commentText,setCommentText] = useState('');
+    const [editingCommentId, setEditingCommentId] = useState(null);
+    const [editingText, setEditingText] = useState('');
     const currentUser=useSelector((state)=>state.user.value);
 
     const handleLike= async()=>{
@@ -48,8 +50,36 @@ const PostCard = ({post, fetchFeeds, onDeleted, playingVideos, toggleVideo}) => 
     }
 
     // Check if user can delete comment (comment owner or post owner)
-    const canDeleteComment = (comment) => {
-        return currentUser?._id === comment.user?._id || currentUser?._id === post.user?._id
+    const canDeleteComment = (comment) => currentUser?._id === comment.user?._id;
+
+    // Check if user can edit comment (only comment owner)
+    const canEditComment = (comment) => currentUser?._id === comment.user?._id;
+
+    const startEditComment = (comment) => {
+        setEditingCommentId(comment._id);
+        setEditingText(comment.text);
+    }
+
+    const cancelEditComment = () => {
+        setEditingCommentId(null);
+        setEditingText('');
+    }
+
+    const saveEditComment = async () => {
+        const newText = editingText.trim();
+        if(!newText) return toast.error('Comment cannot be empty');
+        try{
+            const { data } = await api.put(`/api/post/comment/update/${post._id}/${editingCommentId}`, { text: newText });
+            if(data.success){
+                toast.success('Comment updated');
+                setComments(Array.isArray(data.comments) ? data.comments : []);
+                cancelEditComment();
+            }else{
+                toast.error(data.message || 'Failed to update comment');
+            }
+        }catch(error){
+            toast.error(error?.response?.data?.message || 'Failed to update comment');
+        }
     }
 
     // Handle post deletion
@@ -536,17 +566,40 @@ const PostCard = ({post, fetchFeeds, onDeleted, playingVideos, toggleVideo}) => 
                             <div className='flex-1'>
                                 <div className='flex items-center justify-between'>
                                     <div className='text-sm font-medium'>{comment.user?.full_name || 'User'}</div>
-                                    {canDeleteComment(comment) && (
-                                        <button 
-                                            onClick={() => deleteComment(comment._id)}
-                                            className='text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors'
-                                            title='Delete comment'
-                                        >
-                                            <Trash2 className='w-3 h-3' />
-                                        </button>
-                                    )}
+                                    <div className='flex items-center gap-2'>
+                                        {canEditComment(comment) && (
+                                            editingCommentId === comment._id ? (
+                                                <>
+                                                    <button onClick={saveEditComment} className='text-green-600 text-xs hover:underline'>Save</button>
+                                                    <button onClick={cancelEditComment} className='text-gray-500 text-xs hover:underline'>Cancel</button>
+                                                </>
+                                            ) : (
+                                                <button onClick={() => startEditComment(comment)} className='text-blue-600 text-xs hover:underline'>Edit</button>
+                                            )
+                                        )}
+                                        {canDeleteComment(comment) && (
+                                            <button 
+                                                onClick={() => deleteComment(comment._id)}
+                                                className='text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors'
+                                                title='Delete comment'
+                                            >
+                                                <Trash2 className='w-3 h-3' />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className='text-sm text-gray-700'>{comment.text}</div>
+                                {editingCommentId === comment._id ? (
+                                    <input
+                                        type='text'
+                                        className='w-full text-sm border rounded px-2 py-1 mt-1'
+                                        value={editingText}
+                                        onChange={(e)=>setEditingText(e.target.value)}
+                                        onKeyDown={(e)=>{ if(e.key==='Enter') saveEditComment(); if(e.key==='Escape') cancelEditComment(); }}
+                                        autoFocus
+                                    />
+                                ) : (
+                                    <div className='text-sm text-gray-700'>{comment.text}</div>
+                                )}
                                 <div className='text-xs text-gray-500'>{moment(comment.createdAt).fromNow()}</div>
                             </div>
                         </div>

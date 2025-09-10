@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux'
 import UserCard from '../components/UserCard'
 import api from '../api/axios'
 
+
 const Discover = () => {
     const [users, setUsers] = useState([])
     const [loading, setLoading] = useState(false)
@@ -14,7 +15,14 @@ const Discover = () => {
             setLoading(true)
             const { data } = await api.post('/api/user/discover', { input })
             if (data.success) {
-                setUsers(data.users)
+                const sorted = Array.isArray(data.users)
+                    ? [...data.users].sort((a, b) => {
+                        const aFollowers = Array.isArray(a?.followers) ? a.followers.length : 0
+                        const bFollowers = Array.isArray(b?.followers) ? b.followers.length : 0
+                        return bFollowers - aFollowers
+                    })
+                    : []
+                setUsers(sorted)
             } else {
                 console.error('Failed to fetch users:', data.message)
             }

@@ -121,7 +121,6 @@ export const dummyStoriesData = [
     }
 ]
 
-
 export const dummyPostsData = [
     {
         "_id": "68773e977db16954a783839c",
@@ -295,3 +294,4 @@ export const dummyFollowingData = [
 export const dummyPendingConnectionsData = [
     dummyUserData
 ]
+

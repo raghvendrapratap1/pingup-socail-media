@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux';
 import { useParams } from 'react-router-dom';
 import api from '../api/axios';
-import { addMessage, fetchMessages, resetMessages } from '../features/messages/messagesSlice';
+import { addMessage, fetchMessages, resetMessages, updateMessage as updateMessageAction, deleteMessage as deleteMessageAction } from '../features/messages/messagesSlice';
 import toast from 'react-hot-toast';
 import moment from 'moment';
 import MessageBubble from '../components/MessageBubble';
@@ -21,6 +21,9 @@ const ChatBox = () => {
 
     const [text,setText]=useState('');
     const [image,setImage]=useState(null);
+    const [videoFile,setVideoFile]=useState(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
     const [user,setUser]=useState(null);
     const [replyTo, setReplyTo] = useState(null);
     const [isTyping, setIsTyping] = useState(false);
@@ -41,23 +44,59 @@ const ChatBox = () => {
         }
     }
 
-    const sendMessages = async()=>{
+    const sendMessages = async({ videoSelected } = {})=>{
         try{
-            if(!text && !image) return 
+            if(!text && !image && !videoFile) return 
             const formData = new FormData();
             formData.append('to_user_id', userId);
             formData.append('text',text);
-            if(image){ formData.append('image',image) }
+            const media = videoSelected ? videoFile : image;
+            if(media){ formData.append('media', media) }
             if(replyTo) { formData.append('reply_to', replyTo._id) }
 
-            const {data} = await api.post('/api/message/send',formData);
+            // Optimistic temp message
+            const tempId = `temp-${Date.now()}`;
+            const tempMessage = {
+                _id: tempId,
+                from_user_id: currentUser?._id,
+                to_user_id: userId,
+                text,
+                message_type: media ? (media.type?.startsWith('video/') ? 'video' : 'image') : 'text',
+                media_url: media ? URL.createObjectURL(media) : undefined,
+                createdAt: new Date().toISOString(),
+                delivered: false,
+                seen: false,
+                reactions: [],
+                reply_to: replyTo ? {
+                    _id: replyTo._id,
+                    text: replyTo.text,
+                    message_type: replyTo.message_type,
+                    from_user_id: replyTo.from_user_id
+                } : undefined
+            };
+            dispatch(addMessage(tempMessage));
+
+            setIsUploading(!!media);
+            setUploadProgress(0);
+
+            const {data} = await api.post('/api/message/send',formData,{
+                onUploadProgress: (evt)=>{
+                    if (!evt.total) return;
+                    const pct = Math.round((evt.loaded * 100) / evt.total);
+                    setUploadProgress(pct);
+                }
+            });
 
             if(data.success){
                 setText('');
                 setImage(null);
+                setVideoFile(null);
                 setReplyTo(null);
+                // Replace temp with real
+                dispatch(deleteMessageAction(tempId));
                 dispatch(addMessage(data.message));
-                // Stop typing indicator
+                setIsUploading(false);
+                setUploadProgress(0);
                 setIsTyping(false);
                 emit('stopTyping', { to_user_id: userId });
             }
@@ -65,6 +104,12 @@ const ChatBox = () => {
                 throw new Error(data.message);
             }
         }catch(error){
+            setIsUploading(false);
+            setUploadProgress(0);
+            // Remove temp message on error
+            // We don't have tempId here if exception before declared; ensure safe
+            // In this scope tempId exists; remove it
+            try { dispatch(deleteMessageAction(tempId)); } catch {}
             toast.error(error.message)
         }
     }
@@ -328,6 +373,7 @@ const ChatBox = () => {
                             {group.messages.map((message, index) => {
                                 const fromId = message?.from_user_id?._id || message?.from_user_id;
                                 const isOwn = currentUser?._id && fromId === currentUser._id;
+                                const isTemp = (message?._id || '').startsWith('temp-');
                                 return (
                                     <MessageBubble
                                         key={message._id || `${group.date}-${index}`}
@@ -335,6 +381,10 @@ const ChatBox = () => {
                                         isOwn={isOwn}
                                         currentUser={currentUser}
                                         onReply={handleReply}
+                                        onUpdated={(updated)=> dispatch(updateMessageAction(updated))}
+                                        onDeleted={(id)=> dispatch(deleteMessageAction(id))}
+                                        uploading={isTemp && isUploading}
+                                        progress={isTemp ? uploadProgress : 0}
                                     />
                                 )
                             })}
@@ -360,6 +410,10 @@ const ChatBox = () => {
             onCancelReply={handleCancelReply}
             onTyping={handleTyping}
             isTyping={isTyping}
+            isUploading={isUploading}
+            uploadProgress={uploadProgress}
+            video={videoFile}
+            setVideo={setVideoFile}
         />
     </div>
   ) : (

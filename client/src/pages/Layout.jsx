@@ -22,8 +22,16 @@ const Layout = () => {
             sidebarOpen ? 
             <X className='absolute top-3 p-2 z-100 bg-white rounded-md shadow w-10 h-10 text-gray-600 sm:hidden' onClick={()=>setSidebarOpen(false)}/>
             :
-            <Menu className='absolute top-3 p-2 z-100 bg-white rounded-md shadow w-10 h-10 text-gray-600 sm:hidden' onClick={()=>setSidebarOpen(false)}/>
+            <Menu className='absolute top-3 p-2 z-100 bg-white rounded-md shadow w-10 h-10 text-gray-600 sm:hidden' onClick={()=>setSidebarOpen(true)}/>
         }
+
+        {/* Mobile overlay to close sidebar when tapping outside */}
+        {sidebarOpen && (
+            <div
+                className='fixed inset-0 bg-black/30 sm:hidden z-10'
+                onClick={()=>setSidebarOpen(false)}
+            />
+        )}
        
     </div>
   ) : (

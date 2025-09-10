@@ -73,7 +73,7 @@ const App = () => {
 
     // Listen for new messages
     const handleNewMessage = (message) => {
-      console.log('Socket.IO message received:', message);
+      // Socket.IO message received
       
       // Check if we're in the chat with this user
       if(pathNameRef.current === ('/messages/' + (message?.from_user_id?._id || message?.from_user_id))){
@@ -98,9 +98,25 @@ const App = () => {
     };
   },[currentUser?._id, dispatch, on, off]);
 
+  
   return (
     <>
-      <Toaster />
+      <Toaster 
+        position="top-center"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#ffffff',
+            color: '#333333',
+            borderRadius: '8px',
+            padding: '12px 16px',
+            fontSize: '14px',
+            fontWeight: '500',
+            border: '1px solid #e5e7eb',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+          },
+        }}
+      />
       <Routes>
         {/* Public routes - No Super wrapper */}
         <Route path="/login" element={<Login />} />

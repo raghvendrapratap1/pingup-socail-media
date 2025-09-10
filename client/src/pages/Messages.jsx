@@ -142,7 +142,7 @@ const Messages = () => {
 
   return (
     <div className='min-h-screen bg-white'>
-        <div className='max-w-2xl mx-auto'>
+        <div className='w-full px-6'>
             
             {/* Header */}
             <div className='border-b border-gray-200 px-6 py-4'>
@@ -207,7 +207,7 @@ const Messages = () => {
                                                 ) : lastMessage.message ? (
                                                     lastMessage.message
                                                 ) : (
-                                                    ''
+                                                    'Media message'
                                                 )}
                                             </>
                                         ) : (

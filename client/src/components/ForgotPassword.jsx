@@ -33,7 +33,18 @@ const ForgotPassword = () => {
     const result = await httpAction(data);
     setLoading(false);
 
-    console.log(result);
+    console.log("📧 Forgot password result:", result);
+    
+    // 🔍 DEBUG: Show OTP in browser console (remove in production)
+    if (result?.debug_otp) {
+      console.log("🔐 🔐 🔐 OTP RECEIVED:", result.debug_otp);
+      console.log("🔐 🔐 🔐 OTP RECEIVED:", result.debug_otp);
+      console.log("🔐 🔐 🔐 OTP RECEIVED:", result.debug_otp);
+      console.log("📱 Use this OTP to verify:", result.debug_otp);
+      console.log("🔐 🔐 🔐 OTP RECEIVED:", result.debug_otp);
+      console.log("🔐 🔐 🔐 OTP RECEIVED:", result.debug_otp);
+    }
+
     if (result?.status) {
       toast.success(result?.message);
       localStorage.setItem('email', values.email);
@@ -92,16 +103,7 @@ const ForgotPassword = () => {
                 SEND OTP
               </Button>
 
-              {/* Back Button */}
-              <Button
-                onClick={() => navigate('/')}
-                startIcon={<ArrowBack />}
-                variant="outlined"
-                fullWidth
-                className="!py-3 !rounded-lg"
-              >
-                Back to Login
-              </Button>
+             
             </Form>
           )}
         </Formik>

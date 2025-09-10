@@ -4,15 +4,16 @@ import { TextField, Button } from '@mui/material';
 import * as Yup from 'yup';
 import { Form, Formik } from 'formik';
 import { ArrowBack } from '@mui/icons-material';
-import Countdown from 'react-countdown';
 import { useNavigate } from 'react-router-dom';
 import apis from '../utils/apis';
 import httpAction from '../utils/httpAction';
 import toast from 'react-hot-toast';
-
+ 
 const OtpVarify = () => {
   const navigate = useNavigate();
-  const [timer, setTimer] = useState(5 * 60 * 1000);
+  const [timeLeft, setTimeLeft] = useState(60); // 60 seconds = 1 minute
+  const [canResend, setCanResend] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   const initialState = {
     otp1: '',
@@ -32,6 +33,30 @@ const OtpVarify = () => {
     otp6: Yup.string().required('')
   });
 
+  // Countdown timer effect
+  useEffect(() => {
+    let interval = null;
+    
+    if (timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft(prev => prev - 1);
+      }, 1000);
+    } else {
+      setCanResend(true);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [timeLeft]);
+
+  // Format time as MM:SS
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const submitHandler = async (values) => {
     const otp =
       values.otp1 +
@@ -41,11 +66,11 @@ const OtpVarify = () => {
       values.otp5 +
       values.otp6;
 
-const data = {
-  url: apis().verifyOtp,
-  method: "POST",
-  body: { otp: otp, email: localStorage.getItem("email") }
-};
+    const data = {
+      url: apis().verifyOtp,
+      method: "POST",
+      body: { otp: otp, email: localStorage.getItem("email") }
+    };
 
     console.log("🚀 Sending OTP to backend:", otp);
     const result = await httpAction(data);
@@ -70,40 +95,45 @@ const data = {
     }
   };
 
-  const getTimer = async () => {
-    const data = {
-      url: apis().getTime,
-      method: "POST",
-      body: { email: localStorage.getItem("email") },
-    };
-
-    const result = await httpAction(data);
-    console.log("Raw result:", result);
-
-    if (result?.status) {
-      const serverTime = result?.time;
-      const now = new Date().getTime();
-      const diff = serverTime + 10 * 1000 - now;
-      setTimer(diff > 0 ? diff : 0);
-    }
-  };
-
-  useEffect(() => {
-    getTimer();
-  }, []);
-
   const resendOtp = async () => {
-    const data = {
-      url: apis().forgotPassword,
-      method: "POST",
-      body: { email: localStorage.getItem("email") },
-    };
+    if (!canResend || isResending) return;
 
-    const result = await httpAction(data);
-    console.log(result);
+    try {
+      setIsResending(true);
+      const data = {
+        url: apis().forgotPassword,
+        method: "POST",
+        body: { email: localStorage.getItem("email") },
+      };
 
-    if (result?.status) {
-      setTimer(10 * 1000);
+      const result = await httpAction(data);
+      console.log("🔄 Resend OTP result:", result);
+      
+      // 🔍 DEBUG: Show OTP in browser console (remove in production)
+      if (result?.debug_otp) {
+        console.log("🔐 🔐 🔐 OTP RECEIVED:", result.debug_otp);
+        console.log("🔐 🔐 🔐 OTP RECEIVED:", result.debug_otp);
+        console.log("🔐 🔐 🔐 OTP RECEIVED:", result.debug_otp);
+        console.log("📱 Use this OTP to verify:", result.debug_otp);
+        console.log("🔐 🔐 🔐 OTP RECEIVED:", result.debug_otp);
+        console.log("🔐 🔐 🔐 OTP RECEIVED:", result.debug_otp);
+      }
+
+      if (result?.status) {
+        toast.success("OTP resent successfully!");
+        // Reset timer to 1 minute
+        setTimeLeft(60);
+        setCanResend(false);
+        // Clear all OTP fields
+        // Note: You might want to reset the form here if needed
+      } else {
+        toast.error(result?.message || "Failed to resend OTP");
+      }
+    } catch (error) {
+      console.error("❌ Error resending OTP:", error);
+      toast.error("Failed to resend OTP. Please try again.");
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -165,39 +195,31 @@ const data = {
                 Verify
               </Button>
 
-              {/* Back Button */}
-              <Button
-                onClick={() => navigate('/')}
-                endIcon={<ArrowBack />}
-                variant="outlined"
-                fullWidth
-                className="!py-3 !rounded-lg"
-              >
-                Back to Login
-              </Button>
-
-
-              {/* Countdown */}
-              <div className="text-center text-gray-600 font-medium">
-                <Countdown
-                  key={timer}
-                  date={Date.now() + timer}
-                  renderer={({ minutes, seconds, completed }) => {
-                    if (completed) {
-                      return (
-                        <Button onClick={resendOtp} variant="text">
-                          Resend OTP
-                        </Button>
-                      );
-                    } else {
-                      return (
-                        <span>
-                          {minutes}:{seconds < 10 ? `0${seconds}` : seconds}
-                        </span>
-                      );
-                    }
-                  }}
-                />
+              {/* Countdown Timer and Resend Button */}
+              <div className="text-center">
+                {!canResend ? (
+                  <div className="text-gray-600">
+                    <p className="text-sm mb-2">OTP expires in:</p>
+                    <p className="text-lg font-mono font-bold text-blue-600">
+                      {formatTime(timeLeft)}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-sm text-red-600 font-medium">
+                      OTP has expired!
+                    </p>
+                    <Button 
+                      onClick={resendOtp} 
+                      variant="contained" 
+                      color="primary"
+                      disabled={isResending}
+                      className="!py-2 !px-4 !text-sm"
+                    >
+                      {isResending ? 'Sending...' : 'Resend OTP'}
+                    </Button>
+                  </div>
+                )}
               </div>
 
             </Form>
