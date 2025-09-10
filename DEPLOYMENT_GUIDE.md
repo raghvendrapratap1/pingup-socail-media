@@ -5,7 +5,6 @@
 - ImageKit account
 - Google OAuth credentials
 - Gemini AI API key
-- OpenAI API key
 - Email service (Gmail recommended)
 - Redis service (for Bull queue)
 
@@ -36,8 +35,6 @@ GOOGLE_CALLBACK_URL=https://your-domain.com/auth/google/callback
 # Gemini AI
 GEMINI_API_KEY=your_gemini_api_key
 
-# OpenAI
-OPENAI_API_KEY=your_openai_api_key
 
 # Email Configuration
 EMAIL_USER=your_email@gmail.com
@@ -74,8 +71,7 @@ VITE_SOCKET_URL=https://your-backend-domain.com
 
 ## **Step 5: AI Services Setup**
 1. Get Gemini AI API key from Google AI Studio
-2. Get OpenAI API key from OpenAI platform
-3. Update API keys in backend .env
+2. Update API key in backend .env
 
 ## **Step 6: Email Setup**
 1. Enable 2-factor authentication on Gmail

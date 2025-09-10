@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: social-media-app
+    env: node
+    plan: free
+    rootDir: .
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
+    buildCommand: |
+      cd server && npm install
+      cd ../client && rm -rf node_modules package-lock.json
+      npm cache clean --force
+      npm install --include=optional
+      npm run build
+      cd ..
+    startCommand: |
+      cd server && npm start
+    autoDeploy: true
+

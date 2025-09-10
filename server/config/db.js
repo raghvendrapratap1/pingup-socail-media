@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const connectDB = async () => {
     try {
-        if (!process.env.MONGODB_URL) {
+        if (!process.env.MONGODB_URI) {
             throw new Error("MongoDB URL is not defined in .env file");
         }
 
@@ -20,7 +20,7 @@ const connectDB = async () => {
         });
 
         // Attempt to connect
-        await mongoose.connect(process.env.MONGODB_URL);
+        await mongoose.connect(process.env.MONGODB_URI);
         
         // Verify connection is active
         if (mongoose.connection.readyState === 1) {
