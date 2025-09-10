@@ -56,9 +56,8 @@ export const deleteAccount = async(req,res,next)=>{
                         const urlParts = imageUrl.split('/');
                         const fileName = urlParts[urlParts.length - 1];
                         await imagekit.deleteFile(fileName);
-                        console.log(`🗑️ Post image deleted from ImageKit: ${fileName}`);
                     } catch (mediaError) {
-                        console.log('Post image deletion error:', mediaError.message);
+                        // Post image deletion error
                     }
                 }
             }
@@ -70,9 +69,8 @@ export const deleteAccount = async(req,res,next)=>{
                         const urlParts = videoUrl.split('/');
                         const fileName = urlParts[urlParts.length - 1];
                         await imagekit.deleteFile(fileName);
-                        console.log(`🗑️ Post video deleted from ImageKit: ${fileName}`);
                     } catch (mediaError) {
-                        console.log('Post video deletion error:', mediaError.message);
+                        // Post video deletion error
                     }
                 }
             }
@@ -86,10 +84,9 @@ export const deleteAccount = async(req,res,next)=>{
                 try {
                     const urlParts = story.media_url.split('/');
                     const fileName = urlParts[urlParts.length - 1];
-                    await imagekit.deleteFile(fileName);
-                    console.log(`🗑️ Story media deleted from ImageKit: ${fileName}`);
+                                            await imagekit.deleteFile(fileName);
                 } catch (mediaError) {
-                    console.log('Story media deletion error:', mediaError.message);
+                    // Story media deletion error
                 }
             }
         }
@@ -100,9 +97,8 @@ export const deleteAccount = async(req,res,next)=>{
                 const urlParts = user.profile_picture.split('/');
                 const fileName = urlParts[urlParts.length - 1];
                 await imagekit.deleteFile(fileName);
-                console.log(`🗑️ Profile picture deleted from ImageKit: ${fileName}`);
             } catch (mediaError) {
-                console.log('Profile picture deletion error:', mediaError.message);
+                // Profile picture deletion error
             }
         }
 
@@ -111,9 +107,8 @@ export const deleteAccount = async(req,res,next)=>{
                 const urlParts = user.cover_picture.split('/');
                 const fileName = urlParts[urlParts.length - 1];
                 await imagekit.deleteFile(fileName);
-                console.log(`🗑️ Cover picture deleted from ImageKit: ${fileName}`);
             } catch (mediaError) {
-                console.log('Cover picture deletion error:', mediaError.message);
+                // Cover picture deletion error
             }
         }
 
@@ -155,7 +150,6 @@ export const deleteAccount = async(req,res,next)=>{
             sameSite: 'lax',
         });
 
-        console.log(`🗑️ User account deleted: ${userId}`);
         return res.json({ success: true, message: "Account deleted successfully" });
 
     } catch (error) {
@@ -176,7 +170,6 @@ export const getUserData = async(req,res,next)=>{
         }
         res.json({success:true,user});
     }catch(error){
-        console.log(error);
         return res.json({success:false , message: error.message});
 
     }
@@ -251,7 +244,6 @@ if(cover){
         res.json({success : true,user,message : 'Profile updated successfully'});
     }
     catch(error){
-        console.log(error);
         return res.json({success:false , message: error.message});
 
     }
@@ -278,11 +270,36 @@ export const discoversUsers = async(req,res,next)=>{
 
         const filteredUser = allUsers.filter(user=>user._id.toString() !== userId);
 
-        res.json({success: true,users:filteredUser})
+        // Get current user's following list to check isFollowing status
+        const currentUser = await User.findById(userId);
+        const followingIds = currentUser.following.map(id => id.toString());
+
+        // Get connection status for each user
+        const connections = await Connection.find({
+            $or: [
+                { from_user_id: userId, to_user_id: { $in: filteredUser.map(u => u._id) } },
+                { from_user_id: { $in: filteredUser.map(u => u._id) }, to_user_id: userId }
+            ]
+        });
+
+        // Create a map of connection statuses
+        const connectionStatusMap = {};
+        connections.forEach(conn => {
+            const otherUserId = conn.from_user_id.toString() === userId ? conn.to_user_id.toString() : conn.from_user_id.toString();
+            connectionStatusMap[otherUserId] = conn.status;
+        });
+
+        // Add isFollowing and connectionStatus to each user
+        const usersWithStatus = filteredUser.map(user => ({
+            ...user.toObject(),
+            isFollowing: followingIds.includes(user._id.toString()),
+            connectionStatus: connectionStatusMap[user._id.toString()] || null
+        }));
+
+        res.json({success: true,users:usersWithStatus})
 
 
     }catch(error){
-        console.log(error);
         return res.json({success:false , message: error.message});
 
     }
@@ -312,7 +329,6 @@ export const followUser = async(req,res,next)=>{
         
 
     }catch(error){
-        console.log(error);
         return res.json({success:false , message: error.message});
 
     }
@@ -331,7 +347,6 @@ export const unfollowUser = async(req,res,next)=>{
         res.json({success:true,message:'You are no longer follwoing this user'})
         
     }catch(error){
-        console.log(error);
         return res.json({success:false , message: error.message});
 
     }
@@ -342,8 +357,16 @@ export const unfollowUser = async(req,res,next)=>{
 export const sendConnectionRequest  = async(req,res,next)=>{
     try{
         const userId=req.userId;
-
         const { id } = req.body;
+
+        // Validate required fields
+        if (!id) {
+            return res.status(400).json({ success: false, message: 'User ID is required' });
+        }
+
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Authentication required' });
+        }
 
         // check if user has send more than 20 connection requests in the last 24 hours 
 
@@ -380,7 +403,6 @@ export const sendConnectionRequest  = async(req,res,next)=>{
         
         return res.json({success:false,message:'Connection request pending'});
     }catch(error){
-        console.log(error);
         return res.json({success:false , message: error.message});
     }
 }
@@ -409,7 +431,6 @@ export const getUserConnections  = async(req,res,next)=>{
         res.json({success:true,connections,followers,following,pendingConnections});
 
     }catch(error){
-        console.log(error);
         return res.json({success:false , message: error.message});
     }
 }
@@ -437,7 +458,6 @@ export const acceptConnectionRequest  = async(req,res,next)=>{
         res.json({success:true,message:'Connection accepted successfully' })
 
     }catch(error){
-        console.log(error);
         return res.json({success:false , message: error.message});
     }
 }
@@ -456,7 +476,6 @@ export const getUserProfiles = async(req,res)=>{
 
         res.json({success:true,profile,posts});
     }catch(error){
-        console.log(error);
         res.json({success:true,message:error.message})
     }
 }

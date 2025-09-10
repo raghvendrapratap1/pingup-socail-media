@@ -12,11 +12,4 @@ const generateToken = (user) => {
 
 
 export default generateToken;
-// import jwt from "jsonwebtoken";
-
-// const generateToken = (userId) => {
-//   return jwt.sign({ id: userId }, process.env.ACCESS_TOKEN_KEY, { expiresIn: "7d" });
-// };
-
-// export default generateToken;
 

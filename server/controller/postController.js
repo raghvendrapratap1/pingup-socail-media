@@ -7,35 +7,23 @@ import User from '../models/User.js';
 
 export const addPost = async(req,res)=>{
     try{
-        console.log('=== POST CREATION START ===');
-        console.log('Request body:', req.body);
-        console.log('Request files:', req.files);
-        console.log('User ID:', req.userId);
-
         const userId = req.userId;
-
         const {content,post_type} = req.body;
 
         // Check if files exist and handle undefined case
         const files = req.files || [];
-        console.log('Total files received:', files.length);
         
         const images = files.filter(file => file.mimetype && file.mimetype.startsWith('image/'));
         const videos = files.filter(file => file.mimetype && file.mimetype.startsWith('video/'));
-        
-        console.log('Images found:', images.length);
-        console.log('Videos found:', videos.length);
 
         let image_urls = [];
         let video_urls = [];
 
         // Upload images
         if(images.length > 0){
-            console.log('Starting image uploads...');
             image_urls = await Promise.all(
                 images.map(async(image, index)=>{
                     try {
-                        console.log(`Uploading image ${index + 1}:`, image.originalname);
                         const fileBuffer = fs.readFileSync(image.path);
                         const response = await imagekit.upload({
                             file:fileBuffer,
@@ -46,10 +34,8 @@ export const addPost = async(req,res)=>{
                         // For URL Generation - use direct URL from response
                         const url = response.url; // Use direct URL from response
 
-                        console.log(`Image ${index + 1} uploaded successfully:`, url);
                         return url;
                     } catch (uploadError) {
-                        console.error('Image upload error:', uploadError);
                         throw new Error(`Failed to upload image: ${image.originalname}`);
                     }
                 })
@@ -58,11 +44,9 @@ export const addPost = async(req,res)=>{
 
         // Upload videos
         if(videos.length > 0){
-            console.log('Starting video uploads...');
             video_urls = await Promise.all(
                 videos.map(async(video, index)=>{
                     try {
-                        console.log(`Uploading video ${index + 1}:`, video.originalname);
                         const fileBuffer = fs.readFileSync(video.path);
                         const response = await imagekit.upload({
                             file:fileBuffer,
@@ -73,10 +57,8 @@ export const addPost = async(req,res)=>{
                         // For video URL Generation - use direct URL without transformations
                         const url = response.url; // Use direct URL from response
 
-                        console.log(`Video ${index + 1} uploaded successfully:`, url);
                         return url;
                     } catch (uploadError) {
-                        console.error('Video upload error:', uploadError);
                         throw new Error(`Failed to upload video: ${video.originalname}`);
                     }
                 })
@@ -103,10 +85,6 @@ export const addPost = async(req,res)=>{
             }
         }
 
-        console.log('Final post type:', finalPostType);
-        console.log('Image URLs:', image_urls);
-        console.log('Video URLs:', video_urls);
-
         const postData = {
             user: userId,
             content: content || '',
@@ -115,10 +93,7 @@ export const addPost = async(req,res)=>{
             post_type: finalPostType
         };
 
-        console.log('Creating post with data:', postData);
-
         const newPost = await Post.create(postData);
-        console.log('Post created successfully:', newPost._id);
 
         res.json({success:true,message:"Post created successfully", post: newPost})
     }catch(error){
@@ -139,7 +114,6 @@ export const getFeedPosts  = async(req,res)=>{
 
         res.json({success:true,posts});
     }catch(error){
-        console.log(error);
         res.json({success:false,message:error.message})
     }
 };
@@ -152,7 +126,6 @@ export const getLikedPosts = async(req,res)=>{
         const posts = await Post.find({ likes_count: { $in: [String(userId)] } }).populate('user').sort({createdAt: -1});
         res.json({success:true,posts});
     }catch(error){
-        console.log(error);
         res.json({success:false,message:error.message});
     }
 }
@@ -179,7 +152,6 @@ export const likePost  = async(req,res)=>{
             res.json({success:true,message:'Post Liked'});
         }
     }catch(error){
-        console.log(error);
         res.json({success:false,message:error.message})
     }
 };
@@ -192,7 +164,6 @@ export const getPostComments = async(req,res)=>{
         if(!post) return res.json({success:false,message:'Post not found'});
         res.json({success:true,comments: post.comments || []});
     }catch(error){
-        console.log(error);
         res.json({success:false,message:error.message});
     }
 }
@@ -211,8 +182,44 @@ export const addPostComment = async(req,res)=>{
         await post.populate('comments.user');
         res.json({success:true,message:'Comment added',comments: post.comments});
     }catch(error){
-        console.log(error);
         res.json({success:false,message:error.message});
+    }
+}
+
+// UPDATE COMMENT (only by comment owner)
+export const updateComment = async(req,res)=>{
+    try{
+        const userId = req.userId;
+        const { postId, commentId } = req.params;
+        const { text } = req.body;
+
+        if(!text || !text.trim()){
+            return res.status(400).json({success:false,message:'Comment cannot be empty'});
+        }
+
+        const post = await Post.findById(postId);
+        if(!post){
+            return res.status(404).json({success:false,message:'Post not found'});
+        }
+
+        const comment = post.comments.id(commentId);
+        if(!comment){
+            return res.status(404).json({success:false,message:'Comment not found'});
+        }
+
+        // Only the comment author can edit
+        if(String(comment.user) !== String(userId)){
+            return res.status(403).json({success:false,message:'Not authorized to edit this comment'});
+        }
+
+        comment.text = text.trim();
+        await post.save();
+        await post.populate('comments.user');
+
+        return res.json({success:true,message:'Comment updated', comments: post.comments});
+    }catch(error){
+        console.error('Update comment error:', error);
+        res.status(500).json({success:false,message:error.message || 'Failed to update comment'});
     }
 }
 // DELETE POST
@@ -236,11 +243,10 @@ export const deletePost = async(req,res)=>{
                         const urlParts = imageUrl.split('/');
                         const fileName = urlParts[urlParts.length - 1];
                         await imagekit.deleteFile(fileName);
-                        console.log(`🗑️ Image deleted from ImageKit: ${fileName}`);
                     }
                 }
             }catch(mediaError){
-                console.log('Image deletion error:', mediaError.message);
+                // Image deletion error
             }
         }
 
@@ -251,16 +257,14 @@ export const deletePost = async(req,res)=>{
                         const urlParts = videoUrl.split('/');
                         const fileName = urlParts[urlParts.length - 1];
                         await imagekit.deleteFile(fileName);
-                        console.log(`🗑️ Video deleted from ImageKit: ${fileName}`);
                     }
                 }
             }catch(mediaError){
-                console.log('Video deletion error:', mediaError.message);
+                // Video deletion error
             }
         }
 
         await Post.findByIdAndDelete(postId);
-        console.log(`🗑️ Post deleted: ${postId}`);
         return res.json({success:true,message:'Post deleted successfully'});
     }catch(error){
         console.error('Delete post error:', error);
@@ -285,8 +289,8 @@ export const deleteComment = async(req,res)=>{
             return res.status(404).json({success:false,message:'Comment not found'});
         }
 
-        // Check if user can delete comment (comment owner or post owner)
-        if(String(comment.user) !== String(userId) && String(post.user) !== String(userId)){
+        // Only the comment author can delete
+        if(String(comment.user) !== String(userId)){
             return res.status(403).json({success:false,message:'Not authorized to delete this comment'});
         }
 
@@ -294,7 +298,6 @@ export const deleteComment = async(req,res)=>{
         post.comments = post.comments.filter(c => String(c._id) !== String(commentId));
         await post.save();
 
-        console.log(`🗑️ Comment deleted: ${commentId} from post: ${postId}`);
         return res.json({success:true,message:'Comment deleted successfully'});
     }catch(error){
         console.error('Delete comment error:', error);

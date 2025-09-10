@@ -46,8 +46,8 @@ cron.schedule("*/2 * * * *", async () => {
       });
     }
 
-    console.log("✅ Unseen message notifications sent successfully!");
+    // Unseen message notifications sent successfully
   } catch (error) {
-    console.error("❌ Error sending notifications:", error);
+    // Error sending notifications
   }
 });

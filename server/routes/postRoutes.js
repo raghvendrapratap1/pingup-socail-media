@@ -1,5 +1,5 @@
 import  upload  from '../config/multer.js';
-import { addPost, getFeedPosts, likePost, deletePost, getPostComments, addPostComment, getLikedPosts, deleteComment } from '../controller/postController.js';
+import { addPost, getFeedPosts, likePost, deletePost, getPostComments, addPostComment, getLikedPosts, deleteComment, updateComment } from '../controller/postController.js';
 import auth from '../middleware/auth.js';
 import express from 'express';
 
@@ -13,6 +13,8 @@ postRouter.get('/feed', auth, getFeedPosts);
 postRouter.post('/comments', auth, addPostComment);
 
 postRouter.get('/comments', auth, getPostComments);
+
+postRouter.put('/comment/update/:postId/:commentId', auth, updateComment);
 
 postRouter.delete('/comment/delete/:postId/:commentId', auth, deleteComment);
 

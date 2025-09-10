@@ -1,15 +1,13 @@
-import express from 'express';
-import { chatWithAI } from '../controller/geminiController.js';
-import { validateChatRequest, checkValidationResult, geminiRateLimit } from '../middleware/geminiValidate.js';
+import { Router } from 'express';
+import { ping, chat } from '../controller/geminiController.js';
+import validateChatRequest from '../middleware/geminiValidate.js';
 
-const router = express.Router();
+const router = Router();
 
-// Chat conversation with AI (main endpoint used by frontend)
-router.post('/chat', 
-    geminiRateLimit, 
-    validateChatRequest, 
-    checkValidationResult, 
-    chatWithAI
-);
+// Only two endpoints as requested
+router.get('/', ping);
+router.post('/chat', validateChatRequest, chat);
 
 export default router;
+
+

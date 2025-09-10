@@ -33,15 +33,11 @@ export const addUserStory=async(req,res)=>{
         await storyQueue.add(
             { storyId: story._id },
             { delay: 24 * 60 * 60 * 1000 } // 24 hours
-            // { delay: 10 * 1000 } // 10 seconds
-            
         );
-        console.log(`📅 Story deletion scheduled for ${story._id} in 24 hours`);
 
 
         res.json({success:true,message:'Story Added'});
     }catch(error){
-        console.log(error);
         res.json({success:false,message:error.message})
     }
 }
@@ -65,7 +61,7 @@ export const getStories=async(req,res)=>{
         try{
             await Story.deleteMany({ createdAt: { $lt: cutoffDate } });
         }catch(cleanError){
-            console.log('Story cleanup error:', cleanError.message);
+            // Story cleanup error handled silently
         }
 
         const stories = await Story.find({
@@ -75,7 +71,6 @@ export const getStories=async(req,res)=>{
 
         res.json({success:true,stories});
     }catch(error){
-        console.log(error);
         res.json({success:false,message:error.message})
     }
 }
@@ -99,7 +94,6 @@ export const likeStory = async(req,res)=>{
         await story.save();
         return res.json({success:true,message:'Story liked'});
     }catch(error){
-        console.log(error);
         res.json({success:false,message:error.message})
     }
 }
@@ -130,9 +124,7 @@ export const deleteStory = async(req,res)=>{
                 
                 // Delete from ImageKit
                 await imagekit.deleteFile(fileName);
-                console.log(`🗑️ Media deleted from ImageKit: ${fileName}`);
             }catch(mediaError){
-                console.log('Media deletion error:', mediaError.message);
                 // Continue with story deletion even if media deletion fails
             }
         }
@@ -143,16 +135,14 @@ export const deleteStory = async(req,res)=>{
             const storyJob = jobs.find(job => job.data.storyId === storyId);
             if(storyJob){
                 await storyJob.remove();
-                console.log(`🗑️ Story job removed from queue: ${storyId}`);
             }
         }catch(queueError){
-            console.log('Queue removal error:', queueError.message);
+            // Queue removal error
         }
         
         // Delete story from database
         await Story.findByIdAndDelete(storyId);
         
-        console.log(`🗑️ Story deleted: ${storyId}`);
         res.json({success:true,message:'Story deleted successfully'});
         
     }catch(error){

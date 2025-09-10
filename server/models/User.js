@@ -19,7 +19,7 @@ const userSchema = new mongoose.Schema({
         limit: { type: Number, default: 5 },
         last_attempt: { type: Object },
     },
-    role: { type: String, enum: ['user', 'admin'], default: 'user' }
+    role: { type: String, enum: ['user']}
 }, {
     timestamps: true,
     minimize: false

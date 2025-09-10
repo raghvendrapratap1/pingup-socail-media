@@ -5,15 +5,11 @@ const googleAuth = async (req, res, next) => {
   try {
     const profile = req.user?._json;
     if (!profile) {
-      console.error("Google profile not found in req.user");
       return res.status(400).json({ message: "Google profile not found" });
     }
 
-    console.log("Google Profile:", profile); // Debug log
-
     // Validate required fields
     if (!profile.email) {
-      console.error("Email missing from Google profile");
       return res.status(400).json({ message: "Email is required from Google profile" });
     }
 
@@ -41,8 +37,6 @@ const googleAuth = async (req, res, next) => {
         bio: "Hey there! I am using Pingup",
         role: "user"
       });
-      
-      console.log("New user created:", user._id);
     } else if (!user.googleId) {
       // Update existing user with Google ID
       user.googleId = profile.sub;
@@ -50,12 +44,10 @@ const googleAuth = async (req, res, next) => {
         user.profile_picture = profile.picture;
       }
       await user.save();
-      console.log("Existing user updated with Google ID");
     }
 
     // Generate JWT token
     const token = generateToken(user);
-    console.log("Token generated successfully");
 
     // Set cookie
     res.cookie("accessToken", token, {
@@ -65,10 +57,8 @@ const googleAuth = async (req, res, next) => {
       maxAge: 24 * 60 * 60 * 1000 // 1 day
     });
 
-    console.log("Google auth completed successfully");
     next();
   } catch (error) {
-    console.error("Google Auth Error:", error);
     
     // More specific error messages
     if (error.code === 11000) {

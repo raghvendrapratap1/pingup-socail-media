@@ -1,73 +1,3 @@
-// import nodemailer from 'nodemailer';
-// import sendEmail from '../config/nodeMailer.js';
-
-// //send email for otp for updating password
-
-// const sendEmail= async(data)=>{
-//     try{
-
-//         if(!data.email) throw new Error("Recipient email is missing"); // ✅ check
-
-//         const transport = nodemailer.createTransport({
-//             service:'Gmail',
-//             auth:{
-//                 user:'raghvendrapratapsingh505@gmail.com',
-//                 pass:process.env.APP_PASSWORD
-//             }
-//         })
-
-// const stringOtp = data.otp ? data.otp.toString() : '';
-
-//         const mailOption = {
-//             from : 'raghvendrapratapsingh505@gmail.com',
-//             to:data.email,
-//             subject:'password otp',
-//             text:stringOtp,
-//         }
-
-//         const result = await transport.sendMail(mailOption);
-//         return result;
-//     }catch(error){
-       
-//         console.log(error);
-//         return { status: false, message: error.message }; // optional: return error
-//     }
-// }
-
-// export default sendEmail;
-
-
-// //Function to send Reminder when a new connection request is added
-
-// const sendNewConnectionRequestReminder = inngest.createFunction(
-//     {id:"send-new-connection-request-reminder"},
-//     {event:app/connection-request},
-
-//     async({event,step}) =>{
-//         const {connectionId} = event.data;
-
-//         await step.run('send-connection-request-mail',async()=>{
-//             const connection = await Connection.findByid(connectionId).populate('from_user_id to_user_id)');
-//             const subject= `👋 New Connection Request`;
-//             const  body = `
-//             <div style="font-family: Arial,sans-serif; padding: 20px;">
-//                 <h2>Hi ${connection.to_user_id.full_name},</h2>
-//                 <p>You have a new connection request from ${connection.from_user_id.full_name} - @${connection.from_user_id.username}</p>
-//                 <p>Click <a href="${process.env.FRONTEND_URL}/connections" style="color:#10b981;">here<a/> to accept or reject the request</p?
-//                 <br/>
-                
-//                 <p?Thanks ,<bt/>PingUp - Stay Connected
-                
-//                 </div>`;
-
-//                 await sendEmail({
-//                     to:connection.to_user_id.email,
-//                     subject,
-//                     body
-//                 })
-//         })
-//     }
-// )
 
 
 
@@ -106,7 +36,6 @@ export const sendOtpEmail = async (data) => {
         const result = await transport.sendMail(mailOption);
         return result;
     } catch (error) {
-        console.log("OTP Email Error:", error.message);
         return { status: false, message: error.message };
     }
 };
@@ -138,8 +67,6 @@ export const sendConnectionRequestReminder = async (connectionId) => {
             body
         });
 
-        console.log("✅ Initial connection request email sent");
-
         // Step 3: Wait 24 hours then check again
         setTimeout(async () => {
             try {
@@ -147,7 +74,6 @@ export const sendConnectionRequestReminder = async (connectionId) => {
                 if (!updatedConnection) return;
 
                 if (updatedConnection.status === "accepted") {
-                    console.log("✅ Connection already accepted. No reminder needed.");
                     return;
                 }
 
@@ -168,14 +94,12 @@ export const sendConnectionRequestReminder = async (connectionId) => {
                     subject: reminderSubject,
                     body: reminderBody
                 });
-
-                console.log("✅ Reminder email sent");
             } catch (error) {
-                console.error("❌ Error sending reminder:", error.message);
+                // Error sending reminder
             }
         }, 24 * 60 * 60 * 1000); // 24 hours
 
     } catch (error) {
-        console.error("❌ Error in sendConnectionRequestReminder:", error.message);
+        // Error in sendConnectionRequestReminder
     }
 };

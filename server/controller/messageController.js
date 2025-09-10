@@ -7,50 +7,110 @@ import Message from '../models/Messages.js';
 export const sendMessage = async(req,res)=>{
     try{
         const userId = req.userId;
-        const {to_user_id,text} = req.body;
-        const image= req.file;
+        const {to_user_id, text, reply_to} = req.body;
+        const file= req.file; // renamed: can be image or video
 
         let media_url = '';
-        let message_type = image ? 'image' : 'text' ;
+        let message_type = file ? (file.mimetype?.startsWith('video/') ? 'video' : 'image') : 'text' ;
 
-        if(message_type === 'image'){
-            const fileBuffer = fs.readFileSync(image.path);
+        if(message_type === 'image' || message_type === 'video'){
+            const fileBuffer = fs.readFileSync(file.path);
             const response = await imagekit.upload({
                 file:fileBuffer,
-                fileName:image.originalname,
+                fileName:file.originalname,
+                folder: message_type === 'video' ? 'messages/videos' : 'messages/images'
             });
 
-            media_url = imagekit.url({
-                path:response.filePath,
-                transformation:[
-                    {quality:'auto'},
-                    {format:'webp'},
-                    {width:'1280'}
-                ]
-            })
+            media_url = response.url; // use direct URL returned
         }
 
-        const created = await Message.create({
+        const messageData = {
             from_user_id: userId,
             to_user_id,
             text,
             message_type,
             media_url
-        });
+        };
 
-        const populated = await Message.findById(created._id).populate('from_user_id to_user_id');
+        // Add reply_to if provided
+        if(reply_to) {
+            messageData.reply_to = reply_to;
+        }
+
+        const created = await Message.create(messageData);
+
+        const populated = await Message.findById(created._id)
+            .populate('from_user_id to_user_id')
+            .populate({
+                path: 'reply_to',
+                populate: {
+                    path: 'from_user_id',
+                    select: 'full_name username profile_picture'
+                }
+            });
 
         res.json({success:true,message: populated});
 
         // Send message to recipient using Socket.IO
         const io = req.app.get('io');
         if (io) {
-            // Emit to the recipient's room
             io.to(`user_${to_user_id}`).emit('newMessage', populated);
         }
      }catch(error){
-        console.log(error);
         res.json({success:false,message:error.message});
+    }
+}
+
+// Edit Message (allowed within 1 minute by sender only)
+export const editMessage = async(req,res)=>{
+    try{
+        const userId = req.userId;
+        const { messageId } = req.params;
+        const { text } = req.body;
+
+        if(!text || !text.trim()){
+            return res.status(400).json({success:false,message:'Message cannot be empty'});
+        }
+
+        const message = await Message.findById(messageId);
+        if(!message) return res.status(404).json({success:false,message:'Message not found'});
+        if(String(message.from_user_id) !== String(userId)){
+            return res.status(403).json({success:false,message:'Not authorized to edit this message'});
+        }
+
+        // 1 minute window
+        const oneMinute = 60 * 1000;
+        if(Date.now() - new Date(message.createdAt).getTime() > oneMinute){
+            return res.status(400).json({success:false,message:'Edit window expired'});
+        }
+
+        message.text = text.trim();
+        message.edited = true;
+        message.editedAt = new Date();
+        await message.save();
+
+        return res.json({success:true,message:'Message updated', data: message});
+    }catch(error){
+        res.status(500).json({success:false,message:error.message});
+    }
+}
+
+// Delete Message (sender only)
+export const deleteMessage = async(req,res)=>{
+    try{
+        const userId = req.userId;
+        const { messageId } = req.params;
+
+        const message = await Message.findById(messageId);
+        if(!message) return res.status(404).json({success:false,message:'Message not found'});
+        if(String(message.from_user_id) !== String(userId)){
+            return res.status(403).json({success:false,message:'Not authorized to delete this message'});
+        }
+
+        await Message.findByIdAndDelete(messageId);
+        return res.json({success:true,message:'Message deleted'});
+    }catch(error){
+        res.status(500).json({success:false,message:error.message});
     }
 }
 
@@ -66,6 +126,13 @@ export const getChatMessage = async (req,res)=>{
                 {from_user_id: userId, to_user_id},
                 {from_user_id: to_user_id, to_user_id:userId},
             ]
+        }).populate('from_user_id to_user_id')
+        .populate({
+            path: 'reply_to',
+            populate: {
+                path: 'from_user_id',
+                select: 'full_name username profile_picture'
+            }
         }).sort({createdAt: -1});
 
         //Mark Messages has seen
@@ -73,7 +140,6 @@ export const getChatMessage = async (req,res)=>{
 
         res.json({success:true,messages})
     }catch(error){
-        console.log(error);
         res.json({success:false,message:error.message})
     }
 }
@@ -92,7 +158,6 @@ export const getUserRecentMessages = async(req,res)=>{
         res.json({success:true,messages});
 
     }catch(error){
-        console.log(error);
         res.json({success:false,message: error.message})
     }
 };
@@ -118,8 +183,6 @@ export const clearChat = async (req, res) => {
             ]
         });
 
-        console.log(`Cleared ${result.deletedCount} messages between users ${userId} and ${to_user_id}`);
-
         res.json({
             success: true,
             message: 'Chat cleared successfully',
@@ -134,3 +197,39 @@ export const clearChat = async (req, res) => {
         });
     }
 };
+
+// Toggle Reaction (add/remove for current user)
+export const toggleReaction = async(req,res)=>{
+    try{
+        const userId = req.userId;
+        const { messageId } = req.params;
+        const { emoji } = req.body;
+
+        if(!emoji) return res.status(400).json({success:false,message:'Emoji is required'});
+
+        const message = await Message.findById(messageId);
+        if(!message) return res.status(404).json({success:false,message:'Message not found'});
+
+        let reaction = message.reactions.find(r => r.emoji === emoji);
+        if(!reaction){
+            reaction = { emoji, users: [String(userId)] };
+            message.reactions.push(reaction);
+        } else {
+            const hasReacted = reaction.users.includes(String(userId));
+            if(hasReacted){
+                reaction.users = reaction.users.filter(id => id !== String(userId));
+                // Remove reaction entirely if no users left
+                if(reaction.users.length === 0){
+                    message.reactions = message.reactions.filter(r => r.emoji !== emoji);
+                }
+            }else{
+                reaction.users.push(String(userId));
+            }
+        }
+
+        await message.save();
+        return res.json({success:true,message:'Reaction updated', data: message});
+    }catch(error){
+        res.status(500).json({success:false,message:error.message});
+    }
+}

@@ -1,75 +1,66 @@
-import { generateChatResponse } from '../config/aiConfig.js';
+import { getModel } from '../config/gemini.js';
 
-// POST endpoint - Chat conversation with AI
-export const chatWithAI = async (req, res) => {
+// GET /api/gemini/ping → quick health check
+export const ping = async (req, res) => {
     try {
-        console.log('🔍 Chat request received:', {
-            body: req.body,
-            headers: req.headers,
-            timestamp: new Date().toISOString()
-        });
-
-        const { messages, maxTokens = 500, temperature = 0.7 } = req.body;
-        
-        if (!messages || !Array.isArray(messages) || messages.length === 0) {
-            console.log('❌ Validation failed: Messages array is empty or invalid');
-            return res.status(400).json({
-                success: false,
-                message: 'Messages array is required with at least one message'
-            });
-        }
-
-        // Validate each message
-        for (const message of messages) {
-            if (!message.role || !message.content) {
-                console.log('❌ Validation failed: Message missing role or content:', message);
-                return res.status(400).json({
-                    success: false,
-                    message: 'Each message must have role and content'
-                });
-            }
-            
-            if (!['user', 'assistant'].includes(message.role)) {
-                console.log('❌ Validation failed: Invalid message role:', message.role);
-                return res.status(400).json({
-                    success: false,
-                    message: 'Message role must be either "user" or "assistant"'
-                });
-            }
-        }
-
-        console.log('✅ Validation passed, generating AI response...');
-        console.log('📚 Conversation context:', {
-            messageCount: messages.length,
-            lastMessage: messages[messages.length - 1].content,
-            conversationFlow: messages.map(m => `${m.role}: ${m.content.substring(0, 30)}...`)
-        });
-        
-        // Generate chat response
-        const response = await generateChatResponse(messages);
-        
-        console.log('✅ AI response generated successfully');
-
-        res.json({
-            success: true,
-            message: 'Chat response generated successfully',
-            data: {
-                messages: [...messages, { role: 'assistant', content: response }],
-                response,
-                maxTokens: parseInt(maxTokens),
-                temperature: parseFloat(temperature),
-                timestamp: new Date().toISOString()
-            }
-        });
-
-    } catch (error) {
-        console.error('❌ Chat with AI Error:', error);
-        console.error('❌ Error stack:', error.stack);
-        
-        res.status(500).json({
-            success: false,
-            message: 'Failed to generate chat response. Please try again.',
-            error: error.message
-        });
+        return res.json({ success: true, message: 'Gemini service ready' });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
     }
 };
+
+// POST /api/gemini/chat → generate text from conversation
+export const chat = async (req, res) => {
+    try {
+        const { messages = [], images = [], maxTokens = 1000, temperature = 0.7, model = 'gemini-1.5-flash' } = req.body || {};
+
+        const modelClient = getModel(model);
+
+        // Get the last user message (most recent)
+        const lastUserMessage = messages.filter(m => m.role === 'user').pop();
+        const prompt = lastUserMessage?.content || 'Hello';
+
+        // Build parts: text + optional images
+        const parts = [];
+        parts.push({ text: prompt });
+
+        // Handle images - only from the current request
+        (images || []).forEach((img) => {
+            if (!img) return;
+            if (typeof img === 'string' && img.startsWith('data:')) {
+                // Extract mime type and data from data URL
+                const [header, data] = img.split(',');
+                const mimeType = header.match(/data:([^;]+)/)?.[1] || 'image/png';
+                parts.push({ 
+                    inlineData: { 
+                        mimeType, 
+                        data: data || '' 
+                    } 
+                });
+            }
+        });
+
+        const result = await modelClient.generateContent({
+            contents: [
+                {
+                    role: 'user',
+                    parts
+                }
+            ],
+            generationConfig: {
+                temperature,
+                maxOutputTokens: maxTokens
+            }
+        });
+
+        const text = result?.response?.text?.() || '';
+
+        return res.json({ success: true, data: { response: text } });
+    } catch (err) {
+        console.error('Gemini API Error:', err);
+        const status = err.status || 500;
+        return res.status(status).json({ success: false, message: err.message || 'Gemini request failed' });
+    }
+};
+
+
